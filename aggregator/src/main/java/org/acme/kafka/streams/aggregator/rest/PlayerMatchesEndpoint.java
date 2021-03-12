@@ -16,18 +16,23 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.acme.kafka.streams.aggregator.streams.QueryResult;
+import org.acme.kafka.streams.aggregator.streams.TopologyProducer;
+import org.apache.kafka.streams.Topology;
+
+import io.vertx.core.json.JsonObject;
+
 import org.acme.kafka.streams.aggregator.streams.InteractiveQueries;
 import org.acme.kafka.streams.aggregator.streams.PipelineMetadata;
 
 @ApplicationScoped
-@Path("/game/{gameId}")
+@Path("/game")
 public class PlayerMatchesEndpoint {
 
     @Inject
     InteractiveQueries interactiveQueries;
 
     @GET
-    @Path("/player-matches/{playerId}")
+    @Path("/{gameId}/player-matches/{playerId}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response getPlayerMatches(@PathParam("gameId") String gameId, @PathParam("playerId") String playerId) {
@@ -45,10 +50,15 @@ public class PlayerMatchesEndpoint {
     }
 
     @GET
-    @Path("/meta-data")
+    @Path("/")
     @Produces(MediaType.APPLICATION_JSON)
-    public List<PipelineMetadata> getMetaData() {
-        return interactiveQueries.getMetaData();
+    public Response getCurrentGameId () {
+        String gameId = TopologyProducer.latestGameId;
+        JsonObject json = new JsonObject();
+
+        json.put("gameId", gameId);
+
+        return Response.ok(json).build();
     }
 
     private URI getOtherUri(String host, int port, String id) {

@@ -31,6 +31,8 @@ public class TopologyProducer {
     static final String PLAYER_MATCHES_AGGREGATE_TOPIC = "player-matches-aggregated";
     static final String PLAYER_MATCHES_STORE = "player-matches-store";
 
+    public static String latestGameId;
+
     @Produces
     public Topology buildTopology() {
         StreamsBuilder builder = new StreamsBuilder();
@@ -52,6 +54,8 @@ public class TopologyProducer {
                 String gameId = Aggregate.getGameIdFromJson(json);
                 String playerId = Aggregate.getPlayerIdFromAttackJson(json);
                 String newId = gameId + ":" + playerId;
+
+                latestGameId = gameId;
 
                 LOG.debug("Keyed entry to: " + newId);
 

@@ -16,10 +16,21 @@ The example below is for a player who has played two matches:
 
 ## HTTP API for Player Data
 
-To fetch data for a given player you must pass a `gameId` and `playerId` as URL
-parameters. A sample curl and response is shown below:
+Firstly you need to know the current/latest game ID. You can find this at the
+`/game` endpoint:
 
+```bash
+curl http://localhost:8080/game/
+
+{"gameId":"c538ddcce22a3a58"}
 ```
+
+_NOTE: The `/game` endpoint can return a `null` value for `gameId` if Kafka Streams has not yet processed data._
+
+To fetch data for a given player you must pass the `gameId` and `playerId` as
+URL parameters. A sample curl and response is shown below:
+
+```bash
 export GAME_ID=qohs1SNJwul3R0746IYOn
 export PLAYER_ID=7S724N3jjIDdUQH3XxDMX
 curl http://localhost:8080/game/$GAME_ID/player-matches/$PLAYER_ID
