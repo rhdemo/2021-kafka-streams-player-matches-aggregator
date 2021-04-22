@@ -44,6 +44,9 @@ public class TopologyProducer {
                 Consumed.with(Serdes.String(), Serdes.String())
             )
             .filter((k, v) -> {
+                LOG.trace("incoming key: " + k);
+                LOG.trace("incoming value: " + v);
+
                 JsonObject json = new JsonObject(v);
                 // Ignore anything that's not an "attack". There's no
                 // point in recording a player if they never attacked
