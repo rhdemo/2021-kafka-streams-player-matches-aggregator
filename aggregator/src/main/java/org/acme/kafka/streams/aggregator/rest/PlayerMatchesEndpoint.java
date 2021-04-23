@@ -1,7 +1,10 @@
 package org.acme.kafka.streams.aggregator.rest;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.List;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -17,16 +20,18 @@ import javax.ws.rs.core.Response.Status;
 
 import org.acme.kafka.streams.aggregator.streams.QueryResult;
 import org.acme.kafka.streams.aggregator.streams.TopologyProducer;
-import org.apache.kafka.streams.Topology;
+import org.acme.kafka.streams.aggregator.streams.PipelineMetadata;
+import org.jboss.logging.Logger;
 
 import io.vertx.core.json.JsonObject;
 
 import org.acme.kafka.streams.aggregator.streams.InteractiveQueries;
-import org.acme.kafka.streams.aggregator.streams.PipelineMetadata;
 
 @ApplicationScoped
 @Path("/game")
 public class PlayerMatchesEndpoint {
+
+    private static final Logger LOG = Logger.getLogger(TopologyProducer.class);
 
     @Inject
     InteractiveQueries interactiveQueries;
@@ -38,15 +43,46 @@ public class PlayerMatchesEndpoint {
     public Response getPlayerMatches(@PathParam("gameId") String gameId, @PathParam("playerId") String playerId) {
         String id = gameId + ":" + playerId;
 
+        LOG.debug("received get for key/id: " + id);
+
         QueryResult result = interactiveQueries.getPlayerMatchesStore(id);
         if (result.getResult().isPresent()) {
+            LOG.debug("get for key/id was found in local store: " + id);
             return Response.ok(result.getResult().get()).build();
         } else if (result.getHost().isPresent()) {
-            URI otherUri = getOtherUri(result.getHost().get(), result.getPort().getAsInt(), id);
-            return Response.seeOther(otherUri).build();
+            URL url = getOtherUrl(result.getHost().get(), result.getPort().getAsInt(), gameId, playerId);
+            LOG.debug("get for key/id was found in node at URL: " + url.toString());
+            try {
+                HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setDoOutput(true);
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                String inputLine;
+                StringBuffer content = new StringBuffer();
+                while ((inputLine = in.readLine()) != null) {
+                    content.append(inputLine);
+                }
+                in.close();
+
+                return Response.ok(content).build();
+            } catch (Exception e) {
+                LOG.error("error fetching: " + url.toString());
+                LOG.error("error details: " + e.toString());
+                return Response.status(Status.INTERNAL_SERVER_ERROR.getStatusCode(), "{ \"info\": \"Error fetching data from other Kafka Streams node\" }").build();
+            }
         } else {
             return Response.status(Status.NOT_FOUND.getStatusCode(), "No data found for weather station " + id).build();
         }
+    }
+
+    @GET
+    @Path("/meta-data")
+    @Produces(MediaType.APPLICATION_JSON)
+    public List<PipelineMetadata> getMetaData() {
+        return interactiveQueries.getMetaData();
     }
 
     @GET
@@ -61,10 +97,10 @@ public class PlayerMatchesEndpoint {
         return Response.ok(json).build();
     }
 
-    private URI getOtherUri(String host, int port, String id) {
+    private URL getOtherUrl(String host, int port, String gameId, String playerId) {
         try {
-            return new URI("http://" + host + ":" + port + "/weather-stations/data/" + id);
-        } catch (URISyntaxException e) {
+            return new URL("http://" + host + ":" + port + "/game/" + gameId + "/player-matches/" + playerId);
+        } catch (MalformedURLException e) {
             throw new RuntimeException(e);
         }
     }
